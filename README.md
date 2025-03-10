@@ -52,6 +52,9 @@ rulez add <rule-name>
 # Example: Add Next.js best practices rule
 rulez add nextjs-best-practices
 
+# Add a rule directly from a cursor.directory URL
+rulez add https://cursor.directory/front-end-cursor-rules
+
 # Force overwrite if the rule already exists
 rulez add react --force
 ```
@@ -76,7 +79,7 @@ Options:
 
 - `--force` - Overwrite existing files if they exist
 
-### `rulez add <rule-name>`
+### `rulez add <rule-name|url>`
 
 Adds a rule from the Cursor Directory to your project.
 
@@ -84,6 +87,9 @@ Options:
 
 - `--force` - Overwrite existing rule file if it exists
 - `--local` - Add to local overrides instead of project rules
+- `--offline` - Use simulated content when offline or for testing
+
+You can provide either a rule name or a cursor.directory URL. For more details on using URLs, see [url-based-rules.md](docs/url-based-rules.md).
 
 ## Understanding Local Overrides
 

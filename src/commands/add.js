@@ -10,51 +10,92 @@ const {
   fileExists,
   getRuleFilePath,
   saveRuleToFile,
+  checkCursorRulesDirectoryExists,
 } = require("../utils/file-utils");
 
 /**
- * Check if the Cursor rules directory exists
- * @returns {boolean} True if the rules directory exists
+ * Check if a rule name is valid
+ * @param {string} ruleName - Name to validate
+ * @returns {boolean} True if the name is valid
  */
-const checkCursorRulesDirectoryExists = () => {
-  const cursorDir = path.join(process.cwd(), ".cursor");
-  const rulesDir = path.join(cursorDir, "rules");
-  const localDir = path.join(cursorDir, "local");
-
-  return (
-    fs.existsSync(cursorDir) &&
-    fs.existsSync(rulesDir) &&
-    fs.existsSync(localDir)
-  );
+const isValidRuleName = (ruleName) => {
+  return /^[a-zA-Z0-9_\-]+$/.test(ruleName);
 };
 
 /**
- * Validate the rule name
- * @param {string} ruleName - Name of the rule to validate
- * @returns {boolean} True if valid, false otherwise
+ * Check if a string is a valid URL
+ * @param {string} str - String to check
+ * @returns {boolean} True if valid URL, false otherwise
  */
-const isValidRuleName = (ruleName) => {
-  // Rule name should only contain alphanumeric characters, dashes, and underscores
-  // This is a basic validation, we might need to refine it later
-  return /^[a-zA-Z0-9-_]+$/.test(ruleName);
+const isValidUrl = (str) => {
+  try {
+    const url = new URL(str);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch (err) {
+    return false;
+  }
+};
+
+/**
+ * Check if a URL is from cursor.directory
+ * @param {string} url - URL to check
+ * @returns {boolean} True if from cursor.directory, false otherwise
+ */
+const isCursorDirectoryUrl = (url) => {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname === "cursor.directory";
+  } catch (err) {
+    return false;
+  }
+};
+
+/**
+ * Extract rule name from URL
+ * @param {string} url - URL to extract from
+ * @returns {string} Extracted rule name
+ */
+const extractRuleNameFromUrl = (url) => {
+  try {
+    const urlObj = new URL(url);
+    // Get the last part of the path
+    const pathParts = urlObj.pathname.split("/").filter((part) => part);
+    return pathParts[pathParts.length - 1];
+  } catch (err) {
+    return "";
+  }
 };
 
 /**
  * Execute the add command
- * @param {string} ruleName - Name of the rule to add
+ * @param {string} ruleNameOrUrl - Name of the rule to add, or URL to fetch from
  * @param {Object} options - Command options
  */
-const execute = async (ruleName, options = {}) => {
-  // Validate rule name
-  if (!ruleName) {
-    console.log(chalk.red("Error: Rule name is required"));
-    console.log(`Usage: rulez add <rule-name> [options]`);
+const execute = async (ruleNameOrUrl, options = {}) => {
+  // Handle empty input
+  if (!ruleNameOrUrl) {
+    console.log(chalk.red("Error: Rule name or URL is required"));
+    console.log(`Usage: rulez add <rule-name | url> [options]`);
     return process.exit(1);
   }
 
-  // Validate rule name format
-  if (!isValidRuleName(ruleName)) {
-    console.log(chalk.red(`Error: Invalid rule name '${ruleName}'`));
+  // Check if input is a URL
+  const isUrl = isValidUrl(ruleNameOrUrl);
+  const isCursorUrl = isUrl && isCursorDirectoryUrl(ruleNameOrUrl);
+
+  // Extract ruleName - either directly or from URL
+  let ruleName = ruleNameOrUrl;
+  if (isUrl) {
+    ruleName = extractRuleNameFromUrl(ruleNameOrUrl);
+  }
+
+  // Validate rule name if not a URL or if extracted name is invalid
+  if (!isUrl && !isValidRuleName(ruleName)) {
+    console.log(
+      chalk.red(
+        `Error: '${ruleNameOrUrl}' doesn't appear to be a valid rule name or URL`
+      )
+    );
     console.log(
       chalk.yellow(
         "Rule names must only contain letters, numbers, dashes, and underscores"
@@ -63,8 +104,18 @@ const execute = async (ruleName, options = {}) => {
     return process.exit(1);
   }
 
+  // Check if extracted rule name is valid
+  if (isUrl && !ruleName) {
+    console.log(
+      chalk.red(
+        `Error: Could not extract a valid rule name from URL '${ruleNameOrUrl}'`
+      )
+    );
+    return process.exit(1);
+  }
+
   // Check if the Cursor rules directory structure exists
-  if (!checkCursorRulesDirectoryExists()) {
+  if (!checkCursorRulesDirectoryExists(process.cwd())) {
     console.log(chalk.red("Error: Cursor rules directory structure not found"));
     console.log(
       chalk.yellow(
@@ -77,14 +128,25 @@ const execute = async (ruleName, options = {}) => {
   // Determine target directory based on options
   const targetType = options.local ? "local" : "project";
 
-  console.log(
-    chalk.blue(`Fetching rule '${ruleName}' from Cursor Directory...`)
-  );
+  // Display appropriate fetching message
+  if (isUrl) {
+    console.log(chalk.blue(`Fetching rule from URL: ${ruleNameOrUrl}`));
+    if (isCursorUrl) {
+      console.log(
+        chalk.blue(`Detected cursor.directory URL for rule: ${ruleName}`)
+      );
+    }
+  } else {
+    console.log(
+      chalk.blue(`Fetching rule '${ruleName}' from Cursor Directory...`)
+    );
+  }
 
   try {
     // Attempt to fetch the rule from the remote source
-    const result = await ruleFetcher.fetchRule(ruleName, {
+    const result = await ruleFetcher.fetchRule(ruleNameOrUrl, {
       offlineMode: options.offline,
+      isUrl: isUrl,
     });
 
     if (!result.success) {
@@ -129,10 +191,11 @@ const execute = async (ruleName, options = {}) => {
       console.log(chalk.gray("> ..."));
     }
 
-    // Save the rule content to a file
-    const saveResult = saveRuleToFile(ruleName, result.content, {
+    // Save the rule content to a file using the extracted or provided rule name
+    const saveResult = saveRuleToFile(result.name || ruleName, result.content, {
       force: options.force,
       local: options.local,
+      basePath: process.cwd(),
     });
 
     if (!saveResult.success) {
@@ -161,8 +224,8 @@ const execute = async (ruleName, options = {}) => {
 };
 
 module.exports = {
-  command: "add <rule-name>",
-  description: "Add a Cursor rule from the community directory",
+  command: "add <rule-name|url>",
+  description: "Add a Cursor rule from the community directory or URL",
   options: [
     {
       flags: "--force",
@@ -178,4 +241,8 @@ module.exports = {
     },
   ],
   execute,
+  // Export for testing
+  isValidUrl,
+  isCursorDirectoryUrl,
+  extractRuleNameFromUrl,
 };

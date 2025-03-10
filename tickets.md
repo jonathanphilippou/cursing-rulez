@@ -14,9 +14,10 @@
 - [x] T012: Implement "rulez init" command - Setup .gitignore configuration
 - [x] T020: Implement "rulez add" command - Command structure and argument parsing
 - [x] T021: Implement "rulez add" command - Integration with remote rule source (Cursor Directory)
-- [ ] T022: Implement "rulez add" command - Rule file creation and conflict handling
+- [x] T022: Implement "rulez add" command - Rule file creation and conflict handling
 - [ ] T030: Implement basic local override system - Directory structure and configuration
 - [ ] T031: Implement "rulez add --local" for personal override rules
+- [x] T100: Implement cursor.directory URL support - Adding rules directly from cursor.directory URLs
 
 ## Quality Assurance
 
@@ -26,8 +27,9 @@
 
 ## Documentation & Packaging
 
-- [ ] T050: Complete user documentation and examples
-- [ ] T051: Setup packaging and release workflow
+- [x] T050: Agent workflow documentation
+- [ ] T051: User documentation and examples
+- [ ] T052: Setup packaging and release workflow
 
 ## Bonus Features (if time permits)
 

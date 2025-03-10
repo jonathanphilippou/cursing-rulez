@@ -214,11 +214,12 @@ function updateGitignore(patterns, force = false) {
 }
 
 /**
- * Create the Cursor rules directory structure
- * @param {boolean} force - Whether to force creation even if files exist
+ * Create the directory structure for Cursor rules
+ * @param {boolean} force - Whether to force creation if something exists but is not a directory
+ * @param {string} basePath - Optional base path for the cursor directory (defaults to process.cwd())
  * @returns {Object} Result with success flag and messages
  */
-function createCursorDirectoryStructure(force = false) {
+function createCursorDirectoryStructure(force = false, basePath) {
   const results = {
     success: true,
     messages: [],
@@ -226,7 +227,8 @@ function createCursorDirectoryStructure(force = false) {
   };
 
   // Define the directories to create
-  const cursorsDir = path.join(process.cwd(), ".cursor");
+  const actualBasePath = basePath || process.cwd();
+  const cursorsDir = path.join(actualBasePath, ".cursor");
   const rulesDir = path.join(cursorsDir, "rules");
   const localDir = path.join(cursorsDir, "local");
 
@@ -310,19 +312,21 @@ This rule provides guidance for creating and updating documentation files:
 };
 
 /**
- * Create default rule files in the .cursor/rules directory
- * @param {boolean} force - Whether to overwrite existing files
- * @returns {Object} Result with success flag, messages, and created files
+ * Create default rule files in the Cursor rules directory
+ * @param {boolean} force - Whether to force creation even if files exist
+ * @param {string} basePath - Optional base path for the cursor directory
+ * @returns {Object} Result with success flag and messages
  */
-function createDefaultRuleFiles(force = false) {
+function createDefaultRuleFiles(force = false, basePath) {
   const results = {
     success: true,
     messages: [],
     created: [],
   };
 
-  // Path to .cursor/rules directory
-  const rulesDir = path.join(process.cwd(), ".cursor", "rules");
+  // Define the rule files to create
+  const actualBasePath = basePath || process.cwd();
+  const rulesDir = path.join(actualBasePath, ".cursor", "rules");
 
   // Ensure the rules directory exists
   const dirResult = createDirectory(rulesDir);
@@ -366,14 +370,17 @@ function updateGitignoreForCursor(force = false) {
 }
 
 /**
- * Determine the target file path for a rule
+ * Get the path for a rule file
  * @param {string} ruleName - Name of the rule
  * @param {Object} options - Options for the file creation
+ * @param {string} options.basePath - Optional base path for the cursor directory (defaults to process.cwd())
+ * @param {boolean} options.local - Whether to use the local rules directory
  * @returns {Object} Object with target path and status
  */
 function getRuleFilePath(ruleName, options = {}) {
   // Determine the base directory
-  const cursorDir = path.join(process.cwd(), ".cursor");
+  const basePath = options.basePath || process.cwd();
+  const cursorDir = path.join(basePath, ".cursor");
   const baseDir = options.local
     ? path.join(cursorDir, "local")
     : path.join(cursorDir, "rules");
@@ -395,7 +402,10 @@ function getRuleFilePath(ruleName, options = {}) {
  * Save a rule to a file
  * @param {string} ruleName - Name of the rule
  * @param {string} content - Content of the rule
- * @param {Object} options - Options for saving (force, local)
+ * @param {Object} options - Options for saving (force, local, basePath)
+ * @param {boolean} options.force - Whether to overwrite existing files
+ * @param {boolean} options.local - Whether to save to the local rules directory
+ * @param {string} options.basePath - Optional base path for the cursor directory
  * @returns {Object} Result with success flag and messages
  */
 function saveRuleToFile(ruleName, content, options = {}) {
@@ -434,6 +444,19 @@ function saveRuleToFile(ruleName, content, options = {}) {
   };
 }
 
+/**
+ * Check if the Cursor rules directory structure exists
+ * @param {string} basePath - Optional base path for the cursor directory
+ * @returns {boolean} True if the directory structure exists, false otherwise
+ */
+function checkCursorRulesDirectoryExists(basePath) {
+  const actualBasePath = basePath || process.cwd();
+  const cursorsDir = path.join(actualBasePath, ".cursor");
+  const rulesDir = path.join(cursorsDir, "rules");
+
+  return directoryExists(cursorsDir) && directoryExists(rulesDir);
+}
+
 module.exports = {
   directoryExists,
   fileExists,
@@ -448,4 +471,5 @@ module.exports = {
   saveRuleToFile,
   DEFAULT_RULE_TEMPLATES,
   GITIGNORE_PATTERNS,
+  checkCursorRulesDirectoryExists,
 };

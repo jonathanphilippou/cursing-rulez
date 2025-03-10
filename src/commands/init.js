@@ -17,7 +17,10 @@ const execute = (options = {}) => {
   console.log(chalk.blue("Initializing Cursor rules structure..."));
 
   // Create the directory structure
-  const dirResult = createCursorDirectoryStructure(options.force);
+  const dirResult = createCursorDirectoryStructure(
+    options.force,
+    process.cwd()
+  );
 
   if (!dirResult.success) {
     console.log(chalk.red("Error initializing Cursor rules structure:"));
@@ -25,7 +28,6 @@ const execute = (options = {}) => {
       console.log(chalk.red(`- ${message}`))
     );
     process.exit(1);
-    return; // This is needed to ensure the function stops here in the tests
   }
 
   // Log messages about what directories were created
@@ -38,7 +40,7 @@ const execute = (options = {}) => {
 
   // Create default rule files
   console.log(chalk.blue("\nGenerating default rule files..."));
-  const fileResult = createDefaultRuleFiles(options.force);
+  const fileResult = createDefaultRuleFiles(options.force, process.cwd());
 
   if (!fileResult.success) {
     console.log(chalk.red("Error creating default rule files:"));
@@ -46,7 +48,6 @@ const execute = (options = {}) => {
       console.log(chalk.red(`- ${message}`))
     );
     process.exit(1);
-    return; // This is needed to ensure the function stops here in the tests
   }
 
   // Log messages about what files were created
@@ -67,7 +68,6 @@ const execute = (options = {}) => {
       console.log(chalk.red(`- ${message}`))
     );
     process.exit(1);
-    return; // This is needed to ensure the function stops here in the tests
   }
 
   // Log messages about gitignore updates

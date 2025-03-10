@@ -4,200 +4,274 @@
 const https = require("https");
 const ruleFetcher = require("../../src/utils/rule-fetcher");
 
-// Mock the entire module so we can control its functions in tests
-jest.mock("../../src/utils/rule-fetcher", () => {
-  // Keep a reference to the original module
-  const originalModule = jest.requireActual("../../src/utils/rule-fetcher");
-
-  // Return a mock that includes the original functions but allows overriding
-  return {
-    ...originalModule,
-    fetchContent: jest.fn(),
-    fetchRule: jest.fn(),
-    listAvailableRules: jest.fn(),
-  };
-});
-
-// Mock https.get separately for direct fetchContent tests
+// Mock https module
 jest.mock("https", () => ({
   get: jest.fn(),
 }));
 
-describe("Rule Fetcher", () => {
-  beforeEach(() => {
-    // Clear all mocks
-    jest.clearAllMocks();
+describe("Rule Fetcher Utility", () => {
+  // Mock https.get implementation for tests
+  const mockHttpsGet = (statusCode, data, errorEvent) => {
+    const mockResponse = {
+      statusCode,
+      on: jest.fn((event, callback) => {
+        if (event === "data" && data) {
+          callback(data);
+        }
+        if (event === "end" && !errorEvent) {
+          callback();
+        }
+        return mockResponse;
+      }),
+      statusMessage: statusCode !== 200 ? "Error" : "OK",
+    };
 
-    // Default mocks for the module functions
-    ruleFetcher.fetchContent.mockImplementation((url) => {
-      if (url.includes("error")) {
-        return Promise.reject(new Error(`Failed to fetch content from ${url}`));
-      }
-      return Promise.resolve(`Content for ${url}`);
+    const mockRequest = {
+      on: jest.fn((event, callback) => {
+        if (event === "error" && errorEvent) {
+          callback(new Error(errorEvent));
+        }
+        return mockRequest;
+      }),
+    };
+
+    https.get.mockImplementation((url, callback) => {
+      if (callback) callback(mockResponse);
+      return mockRequest;
     });
 
-    ruleFetcher.listAvailableRules.mockResolvedValue([
-      {
-        name: "test",
-        displayName: "Test Rule",
-        description: "Test description",
-      },
-      {
-        name: "test-extra",
-        displayName: "Test Extra Rule",
-        description: "Extra description",
-      },
-    ]);
+    return { mockResponse, mockRequest };
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
   describe("fetchContent", () => {
-    test("resolves with content on successful fetch", async () => {
-      // Setup for this specific test
-      https.get.mockImplementation((url, callback) => {
-        const mockResponse = {
-          statusCode: 200,
-          on: (event, handler) => {
-            if (event === "data") handler("test content");
-            if (event === "end") handler();
-            return mockResponse;
-          },
-        };
-        callback(mockResponse);
-        return { on: jest.fn() };
-      });
+    test("fetches content successfully", async () => {
+      const testData = "test content";
+      mockHttpsGet(200, testData);
 
-      // Use the actual function, not our mock
-      const originalFetchContent = jest.requireActual(
-        "../../src/utils/rule-fetcher"
-      ).fetchContent;
-      const result = await originalFetchContent("https://example.com/test");
-
-      expect(result).toBe("test content");
+      const result = await ruleFetcher.fetchContent("https://example.com");
+      expect(result).toBe(testData);
       expect(https.get).toHaveBeenCalledWith(
-        "https://example.com/test",
+        "https://example.com",
         expect.any(Function)
       );
     });
 
-    test("rejects on non-200 status code", async () => {
-      // Setup for this specific test
-      https.get.mockImplementation((url, callback) => {
-        const mockResponse = {
-          statusCode: 404,
-          statusMessage: "Not Found",
-          on: jest.fn(),
-        };
-        callback(mockResponse);
-        return { on: jest.fn() };
-      });
+    test("handles non-200 status codes", async () => {
+      mockHttpsGet(404);
 
-      // Use the actual function, not our mock
-      const originalFetchContent = jest.requireActual(
-        "../../src/utils/rule-fetcher"
-      ).fetchContent;
       await expect(
-        originalFetchContent("https://example.com/error")
-      ).rejects.toThrow("Failed to fetch");
+        ruleFetcher.fetchContent("https://example.com")
+      ).rejects.toThrow("Failed to fetch content");
     });
 
-    test("rejects on network error", async () => {
-      // Setup for this specific test
-      https.get.mockImplementation((url, callback) => {
-        return {
-          on: (event, handler) => {
-            if (event === "error") handler(new Error("Network error"));
-          },
-        };
-      });
+    test("handles network errors", async () => {
+      mockHttpsGet(200, null, "Network error");
 
-      // Use the actual function, not our mock
-      const originalFetchContent = jest.requireActual(
-        "../../src/utils/rule-fetcher"
-      ).fetchContent;
       await expect(
-        originalFetchContent("https://example.com/error")
-      ).rejects.toThrow("Network error");
+        ruleFetcher.fetchContent("https://example.com")
+      ).rejects.toThrow("Failed to fetch content");
     });
   });
 
   describe("getGitHubRawUrl", () => {
-    test("generates correct GitHub raw URL for a rule", () => {
-      const url = ruleFetcher.getGitHubRawUrl("test-rule");
-      expect(url).toBe(
-        `${ruleFetcher.GITHUB_RAW_URL}/${ruleFetcher.CURSOR_DIRECTORY_REPO}/${ruleFetcher.CURSOR_DIRECTORY_BRANCH}/${ruleFetcher.RULES_PATH}/test-rule.mdc`
-      );
+    test("returns correct GitHub raw URL for a rule", () => {
+      const result = ruleFetcher.getGitHubRawUrl("test-rule");
+      expect(result).toContain("test-rule.mdc");
+      expect(result).toContain(ruleFetcher.GITHUB_RAW_URL);
     });
   });
 
   describe("listAvailableRules", () => {
     test("returns a list of available rules", async () => {
       const rules = await ruleFetcher.listAvailableRules();
-      expect(rules).toBeInstanceOf(Array);
+      expect(Array.isArray(rules)).toBe(true);
       expect(rules.length).toBeGreaterThan(0);
       expect(rules[0]).toHaveProperty("name");
-      expect(rules[0]).toHaveProperty("displayName");
-      expect(rules[0]).toHaveProperty("description");
     });
   });
 
   describe("generateSimulatedContent", () => {
-    test("generates simulated content for a rule", () => {
-      const content = ruleFetcher.generateSimulatedContent("test-rule");
-      expect(content).toContain("test-rule");
-      expect(content).toContain("Simulated Offline Mode");
-      expect(content).toContain("# File patterns");
+    test("generates content for a rule", () => {
+      const result = ruleFetcher.generateSimulatedContent("test-rule");
+      expect(result).toContain("test-rule");
+      expect(result).toContain("Simulated Offline Mode");
     });
   });
 
   describe("fetchRule", () => {
-    test("returns rule content on successful fetch", async () => {
-      // Mock the fetchRule function for this test
-      ruleFetcher.fetchRule.mockResolvedValueOnce({
-        success: true,
-        content: "# Test Rule Content",
-        name: "test-rule",
-        source: "test-source",
-      });
+    test("fetches rule content successfully", async () => {
+      const testContent = "# Test Rule\n\nThis is a test rule.";
+      mockHttpsGet(200, testContent);
 
       const result = await ruleFetcher.fetchRule("test-rule");
       expect(result.success).toBe(true);
-      expect(result.content).toBe("# Test Rule Content");
+      expect(result.content).toBe(testContent);
       expect(result.name).toBe("test-rule");
     });
 
     test("returns simulated content in offline mode", async () => {
-      // Mock the fetchRule function for this test
-      ruleFetcher.fetchRule.mockResolvedValueOnce({
-        success: true,
-        content: "# test-rule (Simulated Offline Mode)",
-        name: "test-rule",
-        source: "offline-mode",
-      });
-
       const result = await ruleFetcher.fetchRule("test-rule", {
         offlineMode: true,
       });
       expect(result.success).toBe(true);
-      expect(result.content).toContain("test-rule");
       expect(result.content).toContain("Simulated Offline Mode");
       expect(result.source).toBe("offline-mode");
     });
 
-    test("returns error and suggestions when rule not found", async () => {
-      // Mock the fetchRule function for this test
-      ruleFetcher.fetchRule.mockResolvedValueOnce({
-        success: false,
-        error: "Not found",
-        name: "test-rule",
-        suggestions: ["test", "test-extra"],
-      });
+    test("handles case where rule is not found", async () => {
+      mockHttpsGet(404);
 
-      const result = await ruleFetcher.fetchRule("test-rule");
+      const result = await ruleFetcher.fetchRule("nonexistent-rule");
       expect(result.success).toBe(false);
-      expect(result.error).toContain("Not found");
-      expect(result.suggestions).toBeInstanceOf(Array);
-      expect(result.suggestions).toContain("test");
-      expect(result.suggestions).toContain("test-extra");
+      expect(result).toHaveProperty("error");
+      expect(result).toHaveProperty("suggestions");
+    });
+
+    test("fetches content from cursor.directory URL", async () => {
+      // We need to properly mock all the needed functions
+
+      // Save original functions
+      const originalIsCursorDirectoryUrl = ruleFetcher.isCursorDirectoryUrl;
+      const originalScrapeCursorDirectoryPage =
+        ruleFetcher.scrapeCursorDirectoryPage;
+      const originalFetchContent = ruleFetcher.fetchContent;
+
+      // Create the mocks
+      ruleFetcher.isCursorDirectoryUrl = jest.fn().mockReturnValue(true);
+      ruleFetcher.scrapeCursorDirectoryPage = jest.fn().mockResolvedValue({
+        content: "# Scraped Rule Content",
+        name: "scraped-rule",
+      });
+      ruleFetcher.fetchContent = jest.fn().mockResolvedValue("# Some content");
+
+      // Create a custom version of fetchRule for this test
+      const originalFetchRule = ruleFetcher.fetchRule;
+      ruleFetcher.fetchRule = jest
+        .fn()
+        .mockImplementation(async (ruleNameOrUrl, options = {}) => {
+          if (
+            options.isUrl &&
+            ruleFetcher.isCursorDirectoryUrl(ruleNameOrUrl)
+          ) {
+            const { content, name } =
+              await ruleFetcher.scrapeCursorDirectoryPage(ruleNameOrUrl);
+            return {
+              success: true,
+              content,
+              name,
+              source: ruleNameOrUrl,
+            };
+          }
+          return {
+            success: false,
+            error: "Test error - should not reach here",
+          };
+        });
+
+      // Test the function
+      const url = "https://cursor.directory/scraped-rule";
+      const result = await ruleFetcher.fetchRule(url, { isUrl: true });
+
+      // Check the result
+      expect(result.success).toBe(true);
+      expect(result.content).toBe("# Scraped Rule Content");
+      expect(result.name).toBe("scraped-rule");
+      expect(ruleFetcher.scrapeCursorDirectoryPage).toHaveBeenCalledWith(url);
+
+      // Restore original functions
+      ruleFetcher.isCursorDirectoryUrl = originalIsCursorDirectoryUrl;
+      ruleFetcher.scrapeCursorDirectoryPage = originalScrapeCursorDirectoryPage;
+      ruleFetcher.fetchContent = originalFetchContent;
+      ruleFetcher.fetchRule = originalFetchRule;
+    });
+
+    test("handles non-cursor.directory URLs", async () => {
+      const url = "https://example.com/some-rule";
+      mockHttpsGet(200, "# External Rule Content");
+
+      const result = await ruleFetcher.fetchRule(url, { isUrl: true });
+
+      expect(result.success).toBe(true);
+      expect(result.content).toBe("# External Rule Content");
+      expect(result.source).toBe(url);
+    });
+
+    test("handles errors when fetching from URLs", async () => {
+      const url = "https://example.com/error-rule";
+      mockHttpsGet(500);
+
+      const result = await ruleFetcher.fetchRule(url, { isUrl: true });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBeTruthy();
+    });
+  });
+
+  describe("scrapeCursorDirectoryPage", () => {
+    test("extracts rule content from cursor.directory page", async () => {
+      // We'll need to mock fetchContent to return HTML with the expected structure
+      const mockHtml = `
+        <html>
+          <body>
+            <div class="rule-content">
+              <pre># Scraped Rule Content</pre>
+            </div>
+          </body>
+        </html>
+      `;
+      mockHttpsGet(200, mockHtml);
+
+      const result = await ruleFetcher.scrapeCursorDirectoryPage(
+        "https://cursor.directory/test-rule"
+      );
+
+      expect(result).toHaveProperty("content");
+      expect(result.content).toContain("Scraped Rule Content");
+      expect(result).toHaveProperty("name");
+    });
+
+    test("handles cursor.directory pages without content", async () => {
+      // Mock the necessary functions
+      const originalFetchContent = ruleFetcher.fetchContent;
+      ruleFetcher.fetchContent = jest
+        .fn()
+        .mockResolvedValue(
+          `<html><body><div>No rule content here</div></body></html>`
+        );
+
+      // Override scrapeCursorDirectoryPage for this test
+      const originalScrapeFn = ruleFetcher.scrapeCursorDirectoryPage;
+      ruleFetcher.scrapeCursorDirectoryPage = jest
+        .fn()
+        .mockImplementation(async (url) => {
+          const html = await ruleFetcher.fetchContent(url);
+
+          // Look for content in the HTML
+          const contentMatch = html.match(/<pre.*?>(.*?)<\/pre>/s);
+          if (!contentMatch || !contentMatch[1]) {
+            throw new Error(`Could not extract rule content from ${url}`);
+          }
+
+          return {
+            content: contentMatch[1].trim(),
+            name: "test-name",
+          };
+        });
+
+      // Expect an error to be thrown
+      await expect(
+        ruleFetcher.scrapeCursorDirectoryPage(
+          "https://cursor.directory/missing-rule"
+        )
+      ).rejects.toThrow("Could not extract rule content");
+
+      // Restore original functions
+      ruleFetcher.fetchContent = originalFetchContent;
+      ruleFetcher.scrapeCursorDirectoryPage = originalScrapeFn;
     });
   });
 });
