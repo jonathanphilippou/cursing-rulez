@@ -1,11 +1,16 @@
 {
   "name": "cursing-rulez",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "A CLI tool for managing Cursor editor rules, similar to a package manager but specifically for Cursor rules.",
   "main": "src/index.js",
   "bin": {
     "rulez": "./src/index.js"
   },
+  "files": [
+    "src/**/*",
+    "README.md",
+    "LICENSE"
+  ],
   "directories": {
     "test": "tests"
   },
@@ -13,15 +18,27 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "postinstall": "node -e \"console.log('\\x1b[32m✓\\x1b[0m Thanks for installing cursing-rulez! Run \\x1b[36mrulez --help\\x1b[0m to get started.')\""
   },
+  "engines": {
+    "node": ">=14.0.0",
+    "bun": ">=1.0.0"
+  },
+  "trustedDependencies": [
+    "jest"
+  ],
   "keywords": [
     "cursor",
     "rules",
     "cli",
     "cursor-directory"
   ],
-  "author": "",
+  "author": "Jonathan Philippou",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jonathanphilippou/cursing-rulez.git"
+  },
   "license": "MIT",
   "type": "commonjs",
   "dependencies": {

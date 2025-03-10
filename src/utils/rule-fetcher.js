@@ -17,32 +17,14 @@ const RULES_PATH = ".cursor/rules";
  * @returns {Promise<string>} - A promise that resolves to the content
  */
 function fetchContent(url) {
-  return new Promise((resolve, reject) => {
-    https
-      .get(url, (response) => {
-        if (response.statusCode !== 200) {
-          reject(
-            new Error(
-              `Failed to fetch content from ${url}: ${response.statusCode} ${response.statusMessage}`
-            )
-          );
-          return;
-        }
-
-        let data = "";
-        response.on("data", (chunk) => {
-          data += chunk;
-        });
-
-        response.on("end", () => {
-          resolve(data);
-        });
-      })
-      .on("error", (error) => {
-        reject(
-          new Error(`Failed to fetch content from ${url}: ${error.message}`)
-        );
-      });
+  // Use native fetch API which is supported in both modern Node.js and Bun
+  return fetch(url).then((response) => {
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch content from ${url}: ${response.status} ${response.statusText}`
+      );
+    }
+    return response.text();
   });
 }
 

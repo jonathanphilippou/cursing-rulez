@@ -17,13 +17,30 @@ With Cursing Rulez, you can easily initialize, manage, and share project-specifi
 
 ## Installation
 
-```bash
-# Install globally
-npm install -g cursing-rulez
+You can install Cursing Rulez using either npm or Bun:
 
+```bash
+# Using Bun (locally)
+bun add cursing-rulez
+```
+
+```bash
+npm install -g cursing-rulez
+```
+
+```bash
+# Using Bun (globally)
+bun add -g cursing-rulez
+```
+
+```bash
 # Verify installation
 rulez --version
 ```
+
+### Note for Bun Users
+
+This package is fully compatible with Bun! If you see any warnings about postinstall scripts during installation, these are from dependencies and won't affect the functionality of the tool.
 
 ## Usage
 
