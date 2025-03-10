@@ -1,0 +1,13 @@
+# Code Style Guidelines
+
+When working with code in this project, follow these style guidelines:
+
+1. Use consistent indentation (2 spaces recommended).
+2. Use meaningful variable and function names.
+3. Add appropriate comments for complex logic.
+4. Keep functions focused on a single responsibility.
+5. Follow DRY (Don't Repeat Yourself) principles.
+6. Write unit tests for new functionality when applicable.
+7. Document public APIs and important functions.
+
+# File patterns: **/*.js, **/*.ts, **/*.jsx, **/*.tsx

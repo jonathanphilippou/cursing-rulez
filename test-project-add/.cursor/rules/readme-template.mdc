@@ -1,0 +1,17 @@
+# Documentation Template Rule
+
+This rule provides guidance for creating and updating documentation files:
+
+1. README.md should include:
+   - Project title and description
+   - Installation instructions
+   - Usage examples
+   - Configuration options
+   - Contributing guidelines (if applicable)
+   - License information
+
+2. Documentation should be clear, concise, and helpful for both new and experienced users.
+3. Use proper Markdown formatting for headings, code blocks, lists, etc.
+4. Include screenshots or diagrams when they help explain concepts.
+
+# File patterns: **/*.md
